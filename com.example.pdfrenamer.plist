@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <key>Label</key>
+    <string>com.example.pdfrenamer</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/YOURNAME/pdf_renamer.sh</string>
+    </array>
+
+    <key>WatchPaths</key>
+    <array>
+        <string>/Users/YOURNAME/WatchFolder</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>OPENAI_API_KEY</key>
+        <string>YOUR_OPENAI_API_KEY_HERE</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/pdf_renamer_stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/pdf_renamer_stderr.log</string>
+
+</dict>
+</plist>
