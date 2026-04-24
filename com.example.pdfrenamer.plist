@@ -16,12 +16,6 @@
         <string>/Users/YOURNAME/WatchFolder</string>
     </array>
 
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>OPENAI_API_KEY</key>
-        <string>YOUR_OPENAI_API_KEY_HERE</string>
-    </dict>
-
     <key>RunAtLoad</key>
     <true/>
 
