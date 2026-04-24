@@ -7,7 +7,7 @@ your final library folder, and creates a matching `.ris` citation file.
 This is ideal for people who download many PDFs and want automatic
 bibliographic organization.
 
-https://www.youtube.com/watch?v=J2odEjKz3Og
+[Demo video](https://www.youtube.com/watch?v=J2odEjKz3Og)
 
 ---
 
@@ -22,9 +22,10 @@ https://www.youtube.com/watch?v=J2odEjKz3Og
   - volume, issue, pages
   - DOI
 - Renames PDFs into citation-friendly names
-- Moves renamed PDFs to a final destination folder
+- Moves renamed PDFs to a letter-based subfolder in the final destination folder
 - Writes an `.ris` file for reference managers
 - Uses macOS `launchd` to run automatically on folder changes
+- Drains multi-file drops by rescanning until no unprocessed PDFs remain
 - Falls back to a safe filename if metadata is missing
 - Skips reprocessing the same source file using SHA-256 tracking
 
@@ -75,8 +76,9 @@ CURL="/opt/anaconda3/bin/curl"
 Notes:
 
 - `WATCHDIR`: folder where you drop incoming PDFs.
-- `FINALDIR`: destination folder for renamed PDFs.
+- `FINALDIR`: base destination folder for renamed PDFs. The script creates subfolders `A` through `Z` under this folder and places each PDF into the subfolder matching the first letter of the output filename.
 - `PDFTOTEXT`, `JQ`, `CURL`: absolute paths are required under `launchd`.
+- The script accepts both `.pdf` and `.PDF` files.
 
 Find tool paths with:
 
@@ -90,7 +92,7 @@ which curl
 
 Create or rotate your key at:
 
-https://platform.openai.com/api-keys
+[OpenAI API keys](https://platform.openai.com/api-keys)
 
 Store the key in Keychain (you will be prompted securely for the value):
 
@@ -106,7 +108,7 @@ If terminal paste is unreliable for long keys, use the included helper instead:
 cd /Users/rnj/DWork/GitHub/pdf_renamer
 ```
 
-2. Create a local file containing only the raw key on a single line:
+1. Create a local file containing only the raw key on a single line:
 
 ```bash
 printf '%s\n' 'paste-your-full-key-here' > .openai_api_key.local
@@ -121,7 +123,7 @@ Important:
 - Do not add extra spaces before or after the key.
 - The file should contain exactly one line: just the key.
 
-3. Optionally verify the file contents in a safer way before storing it:
+1. Optionally verify the file contents in a safer way before storing it:
 
 ```bash
 wc -c .openai_api_key.local
@@ -130,7 +132,7 @@ shasum -a 256 .openai_api_key.local
 
 `wc -c` includes the trailing newline written by `printf`, so the file byte count will usually be the key length plus 1.
 
-4. Run the helper script:
+1. Run the helper script:
 
 ```bash
 ./set_openai_key.sh
@@ -145,9 +147,9 @@ The script will:
 - print the stored preview, length, and SHA-256
 - fail if the stored value is not an exact match
 
-5. If the source and stored lengths and SHA-256 match, Keychain setup is complete.
+1. If the source and stored lengths and SHA-256 match, Keychain setup is complete.
 
-6. Optionally delete the local file after successful import:
+1. Optionally delete the local file after successful import:
 
 ```bash
 rm .openai_api_key.local
@@ -164,11 +166,8 @@ security find-generic-password -a "$USER" -s "pdf_renamer_openai_api_key" -w >/d
 ### 3. Configure `com.example.pdfrenamer.plist`
 
 1. Rename it to your own label (example: `com.yourname.pdfrenamer.plist`).
-2. Update:
-   - `Label`
-   - `ProgramArguments` path to your script
-   - `WatchPaths` folder
-3. Move it to `~/Library/LaunchAgents/`.
+1. Update `Label`, `ProgramArguments` path to your repo script, and `WatchPaths` folder.
+1. Move it to `~/Library/LaunchAgents/`.
 
 Do not add an `EnvironmentVariables` key for API secrets.
 
@@ -179,11 +178,11 @@ Do not add an `EnvironmentVariables` key for API secrets.
 ### 1. Install the script
 
 ```bash
-mv pdf_renamer.sh "$HOME/pdf_renamer.sh"
-sudo chown "$USER" "$HOME/pdf_renamer.sh"
-chmod +x "$HOME/pdf_renamer.sh"
-xattr -d com.apple.quarantine "$HOME/pdf_renamer.sh" 2>/dev/null || true
+chmod +x /Users/rnj/DWork/GitHub/pdf_renamer/pdf_renamer.sh
+xattr -d com.apple.quarantine /Users/rnj/DWork/GitHub/pdf_renamer/pdf_renamer.sh 2>/dev/null || true
 ```
+
+Use the repo script as the canonical runtime copy so edits and execution stay aligned.
 
 ### 2. Install the plist
 
@@ -192,7 +191,7 @@ mkdir -p "$HOME/Library/LaunchAgents"
 cp com.example.pdfrenamer.plist "$HOME/Library/LaunchAgents/com.yourname.pdfrenamer.plist"
 ```
 
-Edit that copied plist for your paths/label.
+Edit that copied plist for your paths/label, and point `ProgramArguments` at `/Users/rnj/DWork/GitHub/pdf_renamer/pdf_renamer.sh` or your equivalent repo path.
 
 ### 3. Load and start the service
 
@@ -215,8 +214,17 @@ launchctl bootout gui/$(id -u) "$HOME/Library/LaunchAgents/com.yourname.pdfrenam
 1. Drop a PDF into your watch folder.
 2. Script extracts text and asks the OpenAI API for citation metadata.
 3. Script renames PDF as `AuthorBlock_Year_Title.pdf`.
-4. Script moves PDF to your final folder.
+4. Script moves PDF to a subfolder inside your final folder, based on the first letter of the output filename.
 5. Script writes a matching `.ris` file in the watch folder.
+6. While one run is active, later watch events exit quickly by design; the active run rescans the watch folder until no unprocessed PDFs remain.
+
+Example:
+
+- `Moodie_2025_Brain-maps-of-general-cognitive-functioning.pdf`
+  is moved to:
+  `FINALDIR/M/`
+
+If the output filename does not start with a letter, the script uses `FINALDIR/_/`.
 
 If metadata is poor or missing:
 
@@ -229,6 +237,11 @@ Duplicate protection:
   - `WATCHDIR/.pdf_renamer_processed.sha256`
 - If the same file hash appears again, it is skipped.
 
+Concurrency protection:
+
+- The script uses `WATCHDIR/.pdf_renamer.lock` so only one instance processes the queue at a time.
+- If a second `launchd` trigger fires while the first run is active, the second run exits immediately and the active run continues draining the folder.
+
 ---
 
 ## Troubleshooting
@@ -238,6 +251,8 @@ Check LaunchAgent status:
 ```bash
 launchctl print gui/$(id -u)/com.yourname.pdfrenamer | rg "state =|runs =|last exit code"
 ```
+
+For a running agent, `program =` should point at your repo copy of `pdf_renamer.sh`.
 
 Check logs:
 
